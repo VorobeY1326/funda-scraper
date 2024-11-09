@@ -1,7 +1,7 @@
 import sqlite3
 from sqlite3 import OperationalError
 import json
-from telegram import Bot
+from telegram import Bot, constants
 
 from funda_scraper import FundaScraper
 
@@ -39,6 +39,16 @@ def update_houses_db():
     ctx.close()
 
 
+def format_message(row):
+    return f"""
+<a href='{row['url']}'>{row['address']}</a>
+💶 {row['price']:,}
+🏠 {row['living_area']} m2
+🚪 {row['room']} 🛏️ {row['bedroom']}
+⚡️ {row['energy_label']}
+"""
+
+
 async def send_new_houses_to_telegram():
     ctx = sqlite3.connect("db/listings.db")
     ctx.row_factory = sqlite3.Row
@@ -59,7 +69,7 @@ async def send_new_houses_to_telegram():
         for entry in new_entries:
             print(entry['house_id'])
             print("Sending message")
-            await bot.send_message(text="TEST", chat_id=groupId)
+            await bot.send_message(text=format_message(entry), chat_id=groupId, parse_mode=constants.ParseMode.HTML)
             print("Message sent")
 
             ctx.execute(f"UPDATE {TABLE_NAME} SET notification_sent=1 WHERE house_id='{entry['house_id']}'")
