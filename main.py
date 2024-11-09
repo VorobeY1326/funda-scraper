@@ -46,11 +46,13 @@ def update_houses_db():
 
 def format_message(row):
     return f"""
-<a href='{row['url']}'>{row['address']}</a>
+<b>{row['address']}</b>
 💶 {row['price']:,}
 🏠 {row['living_area']} m2
 🚪 {row['room']} 🛏️ {row['bedroom']}
 ⚡️ {row['energy_label']}
+
+{row['url']}
 """
 
 
