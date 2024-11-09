@@ -28,7 +28,7 @@ def update_houses_db():
         n_pages=3,
         min_price=300000,
         max_price=425000,
-        extra_args={},
+        extra_args={'energy_label': '%5B%22A%2B%2B%2B%2B%2B%22,%22A%2B%2B%2B%2B%22,%22A%2B%2B%2B%22,%22A%2B%2B%22,%22A%2B%22,%22A%22,%22B%22,%22C%22%5D'},
         known_urls=known_urls,
     )
 
