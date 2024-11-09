@@ -2,6 +2,8 @@ import sqlite3
 from sqlite3 import OperationalError
 import json
 from telegram import Bot, constants
+import argparse
+import asyncio
 
 from funda_scraper import FundaScraper
 
@@ -88,3 +90,20 @@ async def send_new_houses_to_telegram():
             ctx.commit()
 
     ctx.close()
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Get housing updates and send notifications to Telegram")
+    parser.add_argument("--update", action="store_true", help="Update the houses database.")
+    parser.add_argument("--send", action="store_true", help="Send new houses to Telegram.")
+
+    args = parser.parse_args()
+
+    if args.update:
+        update_houses_db()
+
+    if args.send:
+        asyncio.run(send_new_houses_to_telegram())
+
+if __name__ == "__main__":
+    main()
