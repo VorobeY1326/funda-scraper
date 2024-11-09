@@ -5,6 +5,9 @@ from telegram import Bot, constants
 
 from funda_scraper import FundaScraper
 
+from geoapify import Geoapify
+
+
 TABLE_NAME = "houses"
 
 def update_houses_db():
@@ -65,11 +68,20 @@ async def send_new_houses_to_telegram():
     token = config["api_key"]
     groupId = config["group_id"]
 
+    geoapify = Geoapify()
+
     async with Bot(token) as bot:    
         for entry in new_entries:
             print(entry['house_id'])
             print("Sending message")
             await bot.send_message(text=format_message(entry), chat_id=groupId, parse_mode=constants.ParseMode.HTML)
+            try:
+                coordinates = geoapify.get_coordinates(entry['address'], entry['zip'])
+                map_image = geoapify.get_amsterdam_center_with_marker(coordinates)
+                await bot.send_photo(chat_id=groupId, photo=map_image)
+            except Exception as e:
+                print(e)
+                pass
             print("Message sent")
 
             ctx.execute(f"UPDATE {TABLE_NAME} SET notification_sent=1 WHERE house_id='{entry['house_id']}'")

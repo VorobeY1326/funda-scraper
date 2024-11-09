@@ -2,4 +2,5 @@
 funda_scraper.egg-info/
 build
 telegram_config.json
+geoapify_config.json
 db
