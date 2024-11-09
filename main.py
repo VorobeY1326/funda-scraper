@@ -41,6 +41,7 @@ def update_houses_db():
 
 async def send_new_houses_to_telegram():
     ctx = sqlite3.connect("db/listings.db")
+    ctx.row_factory = sqlite3.Row
 
     new_entries = ctx.execute(
         f"SELECT * FROM {TABLE_NAME} WHERE notification_sent=0"
@@ -56,12 +57,12 @@ async def send_new_houses_to_telegram():
 
     async with Bot(token) as bot:    
         for entry in new_entries:
-            print(entry)
+            print(entry['house_id'])
             print("Sending message")
-            await bot.send_message(text="123", chat_id=groupId)
+            await bot.send_message(text="TEST", chat_id=groupId)
             print("Message sent")
 
-            ctx.execute(f"UPDATE {TABLE_NAME} SET notification_sent=1 WHERE house_id='{entry.house_id}'")
+            ctx.execute(f"UPDATE {TABLE_NAME} SET notification_sent=1 WHERE house_id='{entry['house_id']}'")
             ctx.commit()
 
     ctx.close()
