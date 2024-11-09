@@ -62,7 +62,7 @@ async def send_new_houses_to_telegram():
         f"SELECT * FROM {TABLE_NAME} WHERE notification_sent=0"
     ).fetchall()
 
-    if len(new_entries > 5):
+    if len(new_entries) > 5:
         new_entries = new_entries[0:5]
         print(f"Truncated to 5 out of {len(new_entries)} records")
 
