@@ -6,3 +6,4 @@ tqdm>=4.42.0
 pandas>=1.2
 lxml>=4
 urllib3>=1.26
+python-telegram-bot

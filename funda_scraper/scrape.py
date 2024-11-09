@@ -9,6 +9,7 @@ from collections import OrderedDict
 from typing import List, Optional
 from urllib.parse import urlparse, urlunparse
 
+import urllib3
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
@@ -39,6 +40,8 @@ class FundaScraper(object):
         min_floor_area: Optional[str] = None,
         max_floor_area: Optional[str] = None,
         sort: Optional[str] = None,
+        extra_args: Optional[dict[str, str]] = None,
+        known_urls: Optional[list[str]] = None
     ):
         """
 
@@ -69,6 +72,8 @@ class FundaScraper(object):
         self.min_floor_area = min_floor_area
         self.max_floor_area = max_floor_area
         self.sort = sort
+        self.extra_args = extra_args
+        self.known_urls = known_urls
 
         # Instantiate along the way
         self.links: List[str] = []
@@ -169,6 +174,7 @@ class FundaScraper(object):
         min_floor_area: Optional[str] = None,
         max_floor_area: Optional[str] = None,
         sort: Optional[str] = None,
+        extra_args: Optional[dict[str,str]] = None,
     ) -> None:
         """Resets or initializes the search parameters."""
         if area is not None:
@@ -195,6 +201,8 @@ class FundaScraper(object):
             self.max_floor_area = max_floor_area
         if sort is not None:
             self.sort = sort
+        if extra_args is not None:
+            self.extra_args = extra_args
 
     @staticmethod
     def remove_duplicates(lst: List[str]) -> List[str]:
@@ -240,10 +248,12 @@ class FundaScraper(object):
         urls = self.remove_duplicates(urls)
         fixed_urls = [self.fix_link(url) for url in urls]
 
+        new_urls = list(set(fixed_urls) - set(self.known_urls))
+
         logger.info(
-            f"*** Got all the urls. {len(fixed_urls)} houses found from {self.page_start} to {self.page_end} ***"
+            f"*** Got all the urls. {len(new_urls)} new houses found from {self.page_start} to {self.page_end} ***"
         )
-        self.links = fixed_urls
+        self.links = new_urls
 
     def _build_main_query_url(self) -> str:
         """Constructs the main query URL for the search."""
@@ -278,6 +288,12 @@ class FundaScraper(object):
 
         if self.sort is not None:
             main_url = f"{main_url}&sort=%22{self.check_sort}%22"
+
+        if self.extra_args:
+            for key, value in self.extra_args.items():
+                main_url = f"{main_url}&{key}={value}"
+
+        main_url = urllib3.util.parse_url(main_url).url
 
         logger.info(f"*** Main URL: {main_url} ***")
         return main_url
@@ -407,6 +423,9 @@ class FundaScraper(object):
         :return: the (pre-processed) dataframe from scraping
         """
         self.fetch_all_links()
+        if not self.links:
+            logger.info("*** No new links found. ***")
+            return pd.DataFrame()
         self.scrape_pages()
 
         if raw_data:

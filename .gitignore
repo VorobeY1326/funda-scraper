@@ -1,3 +1,5 @@
 **/__pycache__
 funda_scraper.egg-info/
 build
+telegram_config.json
+db

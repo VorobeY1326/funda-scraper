@@ -1,3 +1,8 @@
+# Changes in that fork
+- Used CSS selector fixes from https://github.com/hilmi-egemen-ciritoglu/funda-scraper
+- Fixed a few CSS selectors myself (most of the fields work, Nov 2024)
+- Borrowed DB and telegram inergration logic from https://github.com/whchien/funda-scraper
+
 # FundaScraper 🏡
 
 [![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
