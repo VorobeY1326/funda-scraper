@@ -80,14 +80,15 @@ async def send_new_houses_to_telegram():
         for entry in new_entries:
             print(entry['house_id'])
             print("Sending message")
-            await bot.send_message(text=format_message(entry), chat_id=groupId, parse_mode=constants.ParseMode.HTML)
             try:
                 coordinates = geoapify.get_coordinates(entry['address'], entry['zip'])
                 map_image = geoapify.get_amsterdam_center_with_marker(coordinates)
-                await bot.send_photo(chat_id=groupId, photo=map_image)
+                await bot.send_photo(chat_id=groupId, photo=map_image, caption=format_message(entry),
+                                     parse_mode=constants.ParseMode.HTML)
             except Exception as e:
+                print('Failed with image generation, sending normal text')
                 print(e)
-                pass
+                await bot.send_message(text=format_message(entry), chat_id=groupId, parse_mode=constants.ParseMode.HTML)
             print("Message sent")
 
             ctx.execute(f"UPDATE {TABLE_NAME} SET notification_sent=1 WHERE house_id='{entry['house_id']}'")
