@@ -27,7 +27,8 @@ def update_houses_db():
         page_start=1,
         n_pages=3,
         min_price=300000,
-        max_price=425000,
+        max_price=400000,
+        min_floor_area=40,
         extra_args={
             'energy_label': '%5B%22A%2B%2B%2B%2B%2B%22,%22A%2B%2B%2B%2B%22,%22A%2B%2B%2B%22,%22A%2B%2B%22,%22A%2B%22,%22A%22,%22B%22,%22C%22%5D',
             'sort': '%22date_down%22'
@@ -54,6 +55,7 @@ def format_message(row):
 🏠 {row['living_area']} m2
 🚪 {row['room']} 🛏️ {row['bedroom']}
 ⚡️ {row['energy_label']}
+⏳ {row['year_built']}
 
 {row['url']}
 """
