@@ -138,7 +138,11 @@ def clean_date_format(x: str) -> Union[datetime, str]:
         elif x.find("day") != -1:
             x = delta_now(int(x.split("day")[0].strip()))
         else:
-            x = datetime.strptime(x, "%d %B %Y")
+            try:
+                x = datetime.strptime(x, "%d %B %Y")
+            except ValueError:
+                x_clean = x.replace(",", "").strip()
+                x = datetime.strptime(x_clean, "%B %d %Y")
         return x
 
     except ValueError:
@@ -168,8 +172,32 @@ def preprocess_data(
         keep_cols.extend(keep_extra_cols)
 
     # Info
-    df["house_id"] = df["url"].apply(lambda x: int(x.split("/")[-2].split("-")[1]))
-    df["house_type"] = df["url"].apply(lambda x: x.split("/")[-2].split("-")[0])
+    def extract_house_id(url):
+        segments = url.strip("/").split("/")
+        last_seg = segments[-1]
+        if last_seg.isdigit():
+            return int(last_seg)
+        else:
+            match = re.search(r"-(\d+)-", last_seg)
+            if match:
+                return int(match.group(1))
+            parts = last_seg.split("-")
+            for p in parts:
+                if p.isdigit():
+                    return int(p)
+            return 0
+
+    def extract_house_type(url):
+        segments = url.strip("/").split("/")
+        last_seg = segments[-1]
+        if last_seg.isdigit():
+            target = segments[-2]
+        else:
+            target = last_seg
+        return target.split("-")[0]
+
+    df["house_id"] = df["url"].apply(extract_house_id)
+    df["house_type"] = df["url"].apply(extract_house_type)
     df = df[df["house_type"].isin(["appartement", "huis"])]
 
     # Price

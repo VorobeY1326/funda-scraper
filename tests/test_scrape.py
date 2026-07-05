@@ -39,10 +39,10 @@ class TestFundaScraper(object):
         assert scraper.n_pages == 2
 
     def test_fix_link(self, scraper):
-        link = "https://www.funda.nl/detail/koop/den-haag/appartement-address-333/88888888/"
+        link = "https://www.funda.nl/en/en/detail/koop/den-haag/appartement-address-333/88888888/"
         fixed_link = scraper.fix_link(link)
         assert (
-            "https://www.funda.nl/koop/den-haag/appartement-88888888-address-333/?old_ldp=true"
+            "https://www.funda.nl/en/detail/koop/den-haag/appartement-address-333/88888888/"
             == fixed_link
         )
 

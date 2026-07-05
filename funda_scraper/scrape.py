@@ -11,7 +11,8 @@ from urllib.parse import urlparse, urlunparse
 
 import urllib3
 import pandas as pd
-import requests
+from curl_cffi import requests
+import re
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
@@ -73,7 +74,7 @@ class FundaScraper(object):
         self.max_floor_area = max_floor_area
         self.sort = sort
         self.extra_args = extra_args
-        self.known_urls = known_urls
+        self.known_urls = known_urls if known_urls is not None else []
 
         # Instantiate along the way
         self.links: List[str] = []
@@ -152,7 +153,7 @@ class FundaScraper(object):
     @staticmethod
     def _get_links_from_one_parent(url: str) -> List[str]:
         """Scrapes all available property links from a single Funda search page."""
-        response = requests.get(url, headers=config.header)
+        response = requests.get(url, headers=config.header, impersonate="chrome110")
         soup = BeautifulSoup(response.text, "lxml")
 
         script_tag = soup.find_all("script", {"type": "application/ld+json"})[0]
@@ -211,18 +212,8 @@ class FundaScraper(object):
 
     @staticmethod
     def fix_link(link: str) -> str:
-        """Fixes a given property link to ensure proper URL formatting."""
-        link_url = urlparse(link)
-        link_path = link_url.path.split("/")
-        property_id = link_path.pop(5)
-        property_address = link_path.pop(4).split("-")
-        link_path = link_path[2:4]
-        property_address.insert(1, property_id)
-        link_path.extend(["-".join(property_address), "?old_ldp=true"])
-        fixed_link = urlunparse(
-            (link_url.scheme, link_url.netloc, "/".join(link_path), "", "", "")
-        )
-        return fixed_link
+        """Fixes double language prefixes in links."""
+        return link.replace("/en/en/", "/en/")
 
     def fetch_all_links(self, page_start: int = None, n_pages: int = None) -> None:
         """Collects all available property links across multiple pages."""
@@ -310,72 +301,158 @@ class FundaScraper(object):
 
     def scrape_one_link(self, link: str) -> List[str]:
         """Scrapes data from a single property link."""
-
-        # Initialize for each page
-        response = requests.get(link, headers=config.header)
+        response = requests.get(link, headers=config.header, impersonate="chrome110")
         soup = BeautifulSoup(response.text, "lxml")
 
-        # Get the value according to respective CSS selectors
-        if self.to_buy:
-            if self.find_past:
-                list_since_selector = self.selectors.date_list
-            else:
-                list_since_selector = self.selectors.listed_since
-        else:
-            if self.find_past:
-                list_since_selector = ".fd-align-items-center:nth-child(9) span"
-            else:
-                list_since_selector = ".fd-align-items-center:nth-child(7) span"
+        # 1. Parse JSON-LD
+        json_ld_data = {}
+        breadcrumbs = []
+        script_tags = soup.find_all("script", {"type": "application/ld+json"})
+        for tag in script_tags:
+            try:
+                js = json.loads(tag.contents[0])
+                if isinstance(js, list):
+                    js = js[0]
+                if js.get("@type") == "BreadcrumbList" or (isinstance(js.get("@type"), list) and "BreadcrumbList" in js.get("@type")):
+                    breadcrumbs = [item["item"]["name"] for item in js.get("itemListElement", []) if "item" in item]
+                elif "Apartment" in js.get("@type", []) or "Product" in js.get("@type", []) or "House" in js.get("@type", []):
+                    json_ld_data = js
+            except Exception as e:
+                pass
 
-        result = [
-            link,
-            self.get_value_from_css(soup, self.selectors.price),
-            self.get_value_from_css(soup, self.selectors.address),
-            self.get_value_from_css(soup, self.selectors.descrip),
-            self.get_value_from_css(soup, list_since_selector),
-            self.get_value_from_css(soup, self.selectors.zip_code),
-            self.get_value_from_css(soup, self.selectors.size),
-            self.get_value_from_css(soup, self.selectors.year),
-            self.get_value_from_css(soup, self.selectors.living_area),
-            self.get_value_from_css(soup, self.selectors.kind_of_house),
-            self.get_value_from_css(soup, self.selectors.building_type),
-            self.get_value_from_css(soup, self.selectors.num_of_rooms),
-            self.get_value_from_css(soup, self.selectors.num_of_bathrooms),
-            self.get_value_from_css(soup, self.selectors.layout),
-            self.get_value_from_css(soup, self.selectors.energy_label),
-            self.get_value_from_css(soup, self.selectors.insulation),
-            self.get_value_from_css(soup, self.selectors.heating),
-            self.get_value_from_css(soup, self.selectors.ownership),
-            self.get_value_from_css(soup, self.selectors.exteriors),
-            self.get_value_from_css(soup, self.selectors.parking),
-            self.get_value_from_css(soup, self.selectors.neighborhood_name),
-            self.get_value_from_css(soup, self.selectors.date_list),
-            self.get_value_from_css(soup, self.selectors.date_sold),
-            self.get_value_from_css(soup, self.selectors.term),
-            self.get_value_from_css(soup, self.selectors.price_sold),
-            self.get_value_from_css(soup, self.selectors.last_ask_price),
-            self.get_value_from_css(soup, self.selectors.last_ask_price_m2).split("\r")[
-                0
-            ],
-        ]
+        # 2. Parse DL/DT/DD characteristics
+        characteristics = {}
+        for dl in soup.find_all("dl"):
+            for dt, dd in zip(dl.find_all("dt"), dl.find_all("dd")):
+                key = dt.text.strip().lower()
+                val = dd.text.strip()
+                characteristics[key] = val
 
-        # Deal with list_since_selector especially, since its CSS varies sometimes
-        if clean_date_format(result[4]) == "na":
-            for i in range(6, 16):
-                selector = f".fd-align-items-center:nth-child({i}) span"
-                update_list_since = self.get_value_from_css(soup, selector)
-                if clean_date_format(update_list_since) == "na":
-                    pass
-                else:
-                    result[4] = update_list_since
+        # Helper to search keys in characteristics
+        def get_char(keys):
+            for k in keys:
+                if k.lower() in characteristics:
+                    return characteristics[k.lower()]
+            return "na"
 
-        photos_list = [
-            p.get("data-lazy-srcset") for p in soup.select(self.selectors.photo)
-        ]
+        # 3. Extract core fields from JSON-LD
+        price_val = "na"
+        if json_ld_data and "offers" in json_ld_data:
+            price_val = f"€ {json_ld_data['offers'].get('price', '')}"
+
+        address_val = "na"
+        if json_ld_data:
+            address_val = json_ld_data.get("name", "na")
+
+        # Photos
+        photos_list = []
+        if json_ld_data and "photo" in json_ld_data:
+            for photo_obj in json_ld_data["photo"]:
+                if isinstance(photo_obj, dict) and "contentUrl" in photo_obj:
+                    photos_list.append(photo_obj["contentUrl"])
         photos_string = ", ".join(photos_list)
 
-        # Clean up the retried result from one page
-        result = [r.replace("\n", "").replace("\r", "").strip() for r in result]
+        # 4. Zip code
+        zip_code_val = "na"
+        h1 = soup.find("h1")
+        if h1:
+            match = re.search(r"(\d{4}\s?[A-Z]{2})", h1.text)
+            if match:
+                zip_code_val = match.group(1)
+
+        # Neighborhood from breadcrumbs
+        neighborhood_name_val = "na"
+        if len(breadcrumbs) >= 3:
+            neighborhood_name_val = breadcrumbs[2]
+
+        # Description
+        descrip_val = "na"
+        desc_heading = soup.find(lambda tag: tag.name in ['h2', 'h3'] and tag.text.strip().lower() in ['description', 'omschrijving'])
+        if desc_heading:
+            sibling = desc_heading.find_next_sibling()
+            if sibling:
+                descrip_val = sibling.text.strip()
+
+        # Listed since
+        listed_since_val = get_char(["Listed since", "Aangeboden sinds"])
+
+        # Size & Living area
+        size_val = get_char(["Living area", "Woonoppervlakte"])
+        living_area_val = size_val
+
+        # Year built
+        year_val = get_char(["Year of construction", "Bouwjaar"])
+
+        # Kind of house
+        kind_of_house_val = get_char(["Type apartment", "Type woning", "Type house", "Soort appartement", "Soort woonhuis"])
+
+        # Building type
+        building_type_val = get_char(["Building type", "Bouwvorm"])
+
+        # Rooms & Bathrooms
+        num_of_rooms_val = get_char(["Number of rooms", "Aantal kamers"])
+        num_of_bathrooms_val = get_char(["Number of bath rooms", "Aantal badkamers"])
+
+        # Layout
+        layout_val = get_char(["Layout", "Indeling"])
+
+        # Energy label
+        energy_label_val = get_char(["Energy label", "Energielabel"])
+
+        # Insulation
+        insulation_val = get_char(["Insulation", "Isolatie"])
+
+        # Heating
+        heating_val = get_char(["Heating", "Verwarming"])
+
+        # Ownership
+        ownership_val = get_char(["Ownership situation", "Eigendomssituatie", "Ligging"])
+
+        # Exteriors & Parking
+        exteriors_val = get_char(["Balcony/roof garden", "Balkon/dakterras", "Buitenruimte"])
+        parking_val = get_char(["Type of parking facilities", "Parkeerfaciliteiten", "Garage"])
+
+        # Historical parameters (sold data)
+        date_list_val = get_char(["Date of list", "Aanmeldingsdatum"])
+        date_sold_val = get_char(["Date of sale", "Verkoopdatum"])
+        term_val = get_char(["Term", "Looptijd"])
+        price_sold_val = get_char(["Selling price", "Verkoopprijs"])
+        last_ask_price_val = price_val
+        last_ask_price_m2_val = get_char(["Asking price per m²", "Asking price per m?", "Vraagprijs per m²"])
+
+        # Map to scraper results structure
+        result = [
+            link,
+            price_val,
+            address_val,
+            descrip_val,
+            listed_since_val,
+            zip_code_val,
+            size_val,
+            year_val,
+            living_area_val,
+            kind_of_house_val,
+            building_type_val,
+            num_of_rooms_val,
+            num_of_bathrooms_val,
+            layout_val,
+            energy_label_val,
+            insulation_val,
+            heating_val,
+            ownership_val,
+            exteriors_val,
+            parking_val,
+            neighborhood_name_val,
+            date_list_val,
+            date_sold_val,
+            term_val,
+            price_sold_val,
+            last_ask_price_val,
+            last_ask_price_m2_val,
+        ]
+
+        # Clean up text
+        result = [str(r).replace("\n", "").replace("\r", "").strip() for r in result]
         result.append(photos_string)
         return result
 
@@ -393,7 +470,15 @@ class FundaScraper(object):
         for i, c in enumerate(content):
             df.loc[len(df)] = c
 
-        df["city"] = df["url"].map(lambda x: x.split("/")[4])
+        def get_city_from_url(url):
+            parts = url.split("/")
+            if "koop" in parts:
+                return parts[parts.index("koop") + 1]
+            elif "huur" in parts:
+                return parts[parts.index("huur") + 1]
+            return "na"
+
+        df["city"] = df["url"].map(get_city_from_url)
         df["log_id"] = datetime.datetime.now().strftime("%Y%m-%d%H-%M%S")
         if not self.find_past:
             df = df.drop(["term", "price_sold", "date_sold"], axis=1)
