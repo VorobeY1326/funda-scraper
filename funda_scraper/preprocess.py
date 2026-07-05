@@ -8,6 +8,8 @@ import pandas as pd
 from dateutil.parser import parse
 
 from funda_scraper.config.core import config
+import logging
+logging.basicConfig(level=logging.INFO)
 
 
 def clean_price(x: str) -> int:
@@ -33,12 +35,16 @@ def clean_year(x: str) -> int:
 
 
 def clean_living_area(x: str) -> int:
-    """Clean the 'living_area' and transform from string to integer"""
+    """Clean the 'living_area' and transform from string to integer.
+    Handles values like "75 m²" and "ca. 59 m²".
+    """
     try:
-        return int(str(x).replace(",", "").split(" m²")[0])
-    except ValueError:
+        # Extract the first integer number from the string
+        match = re.search(r"(\d+)", str(x))
+        if match:
+            return int(match.group(1))
         return 0
-    except IndexError:
+    except Exception:
         return 0
 
 
@@ -209,7 +215,7 @@ def preprocess_data(
     df["price_m2"] = round(df.price / df.living_area, 1)
 
     # Location
-    df["zip"] = df["zip_code"].apply(lambda x: x[:4])
+    #df["zip"] = df["zip_code"].apply(lambda x: x[:4])
 
     # House layout
     df["room"] = df["num_of_rooms"].apply(find_n_room)

@@ -21,17 +21,20 @@ def update_houses_db():
         known_urls = set()
 
     scraper = FundaScraper(
-        area="amsterdam,5km",
+        area="[%22amstelveen%22,%22purmerend%22,%22bussum%22,%22krommenie%22,%22leiden%22,%22hilversum%22,%22assendelft%22]",
         want_to="buy",
         find_past=False,
         page_start=1,
         n_pages=3,
-        min_price=300000,
-        max_price=400000,
-        min_floor_area=40,
         extra_args={
-            'energy_label': '%5B%22A%2B%2B%2B%2B%2B%22,%22A%2B%2B%2B%2B%22,%22A%2B%2B%2B%22,%22A%2B%2B%22,%22A%2B%22,%22A%22,%22B%22,%22C%22%5D',
-            'sort': '%22date_down%22'
+            'price': '%22375000-450000%22',
+            'bedrooms': '%222-%22',
+            'energy_label': '[%22A%2B%2B%2B%2B%22,%22A%2B%2B%2B%22,%22A%2B%2B%22,%22A%2B%22,%22A%22,%22B%22,%22C%22,%22A%2B%2B%2B%2B%2B%22]',
+            'construction_period': '[%22from_2001_to_2010%22,%22from_2011_to_2020%22,%22after_2020%22,%22from_1991_to_2000%22]',
+            'object_type': '[%22apartment%22]',
+            'construction_type': '[%22resale%22]',
+            'sort': '%22date_down%22',
+            'custom_area': '%257Dw%257D%255Cotk~HmqFnrG_%257BK%257BdCbvHo%257BGhvIzmC,s%257D%257C%255Cetu~HttFcqEkxCwrAytRzmFnxO~u%2540'
         },
         known_urls=known_urls,
     )

@@ -250,8 +250,16 @@ class FundaScraper(object):
         """Constructs the main query URL for the search."""
         query = "koop" if self.to_buy else "huur"
 
+        if self.area.startswith("["):          # list
+            # Use the value as‑is (the scraper will still URL‑encode the
+            # *extra_args* later, but we deliberately skip the wrapper.)
+            area_part = f"{self.area}"
+        else:
+            # Default behaviour – treat the supplied string as a plain area name
+            area_part = f"%5B%22{self.area}%22%5D"
+
         main_url = (
-            f"{self.base_url}/zoeken/{query}?selected_area=%5B%22{self.area}%22%5D"
+            f"{self.base_url}/zoeken/{query}?selected_area={area_part}"
         )
 
         if self.property_type:
