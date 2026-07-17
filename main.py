@@ -8,6 +8,7 @@ import asyncio
 from funda_scraper import FundaScraper
 
 from geoapify import Geoapify
+from transitous import Transitous, TransitousTravelTimeResult
 
 
 TABLE_NAME = "houses"
@@ -21,20 +22,20 @@ def update_houses_db():
         known_urls = set()
 
     scraper = FundaScraper(
-        area="[%22amstelveen%22,%22purmerend%22,%22bussum%22,%22krommenie%22,%22leiden%22,%22hilversum%22,%22assendelft%22]",
+        area="",
         want_to="buy",
         find_past=False,
         page_start=1,
         n_pages=3,
         extra_args={
-            'price': '%22375000-450000%22',
+            'price': '%22370000-500000%22',
             'bedrooms': '%222-%22',
             'energy_label': '[%22A%2B%2B%2B%2B%22,%22A%2B%2B%2B%22,%22A%2B%2B%22,%22A%2B%22,%22A%22,%22B%22,%22C%22,%22A%2B%2B%2B%2B%2B%22]',
-            'construction_period': '[%22from_2001_to_2010%22,%22from_2011_to_2020%22,%22after_2020%22,%22from_1991_to_2000%22]',
-            'object_type': '[%22apartment%22]',
+            # 'construction_period': '[%22from_2001_to_2010%22,%22from_2011_to_2020%22,%22after_2020%22,%22from_1991_to_2000%22]',
+            'object_type': '[%22apartment%22,%22house%22]',
             'construction_type': '[%22resale%22]',
             'sort': '%22date_down%22',
-            'custom_area': '%257Dw%257D%255Cotk~HmqFnrG_%257BK%257BdCbvHo%257BGhvIzmC,s%257D%257C%255Cetu~HttFcqEkxCwrAytRzmFnxO~u%2540'
+            'custom_area': '%7Dfh%5E%7Bat%7DHdPueRu_N%7BF%7DvAptTlfP_fA,krr%5D_dl~H%7Ba@jrFwrG%7DBdIg%7BDlkHer@,%7D%60p%5Dqli~Hoy@jcD~uJteBtqGmbIwoHiaBkxCujDkmGrwChhCvlD,mf%7C%5Cwuu~HzgFkmE%7B%60CkhB%7DeSbfGl%7DAnqAn%60M%7B%60@,_%7Dq%5Cyhm~HoqFgDgjB~w@~eEduMziQ_nDcsL%7DyI,k%7Ds%5Cep%7C~H%60eTutAsoBqdHcfNrvBaqDz_EvbBvaA,%7Bv%7C%5Csnk_IqfEyuGoxOjiC~yFpiG%60eNc%7DB'
         },
         known_urls=known_urls,
     )
@@ -51,7 +52,7 @@ def update_houses_db():
     ctx.close()
 
 
-def format_message(row):
+def format_message(row, travel_time: TransitousTravelTimeResult) -> str:
     return f"""
 <b>{row['address']}</b>
 💶 {row['price']:,}
@@ -59,6 +60,7 @@ def format_message(row):
 🚪 {row['room']} 🛏️ {row['bedroom']}
 ⚡️ {row['energy_label']}
 ⏳ {row['year_built']}
+{travel_time.travel_modes_emojis} {travel_time.travel_time_min}-{travel_time.travel_time_max}
 
 {row['url']}
 """
@@ -83,6 +85,7 @@ async def send_new_houses_to_telegram():
     groupId = config["group_id"]
 
     geoapify = Geoapify()
+    transitous = Transitous()
 
     async with Bot(token) as bot:    
         for entry in new_entries:
@@ -91,7 +94,8 @@ async def send_new_houses_to_telegram():
             try:
                 coordinates = geoapify.get_coordinates(entry['address'], entry['zip'])
                 map_image = geoapify.get_amsterdam_center_with_marker(coordinates)
-                await bot.send_photo(chat_id=groupId, photo=map_image, caption=format_message(entry),
+                travel_time = transitous.get_travel_time_to_work(coordinates[0], coordinates[1])
+                await bot.send_photo(chat_id=groupId, photo=map_image, caption=format_message(entry, travel_time),
                                      parse_mode=constants.ParseMode.HTML)
             except Exception as e:
                 print('Failed with image generation, sending normal text')

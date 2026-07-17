@@ -216,6 +216,7 @@ def preprocess_data(
 
     # Location
     #df["zip"] = df["zip_code"].apply(lambda x: x[:4])
+    df["zip"] = df["zip_code"]
 
     # House layout
     df["room"] = df["num_of_rooms"].apply(find_n_room)

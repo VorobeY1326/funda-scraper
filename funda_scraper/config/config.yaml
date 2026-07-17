@@ -20,6 +20,7 @@ keep_cols:
     - bathroom
     - living_area
     - energy_label
+    - zip
     - address
     - year_built
     - house_age
