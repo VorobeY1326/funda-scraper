@@ -8,3 +8,4 @@ lxml>=4
 urllib3>=1.26
 python-telegram-bot
 curl-cffi
+shapely>=2.1.2

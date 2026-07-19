@@ -4,6 +4,7 @@ build
 telegram_config.json
 geoapify_config.json
 transitous_config.json
+**/areas
 output_log.txt
 db
 .venv

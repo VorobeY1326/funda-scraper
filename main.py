@@ -9,6 +9,7 @@ from funda_scraper import FundaScraper
 
 from geoapify import Geoapify
 from transitous import Transitous, TransitousTravelTimeResult
+from areas import Areas, AreaType
 
 
 TABLE_NAME = "houses"
@@ -52,9 +53,15 @@ def update_houses_db():
     ctx.close()
 
 
-def format_message(row, travel_time: TransitousTravelTimeResult) -> str:
+def format_message(row, travel_time: TransitousTravelTimeResult, area_type: AreaType) -> str:
+    if area_type == AreaType.GREEN:
+        area_marker = '🟢 '
+    elif area_type == AreaType.ORANGE:
+        area_marker = '🟠 '
+    else:
+        area_marker = ''
     return f"""
-<b>{row['address']}</b>
+{area_marker}<b>{row['address']}</b>
 💶 {row['price']:,}
 🏠 {row['living_area']} m2
 🚪 {row['room']} 🛏️ {row['bedroom']}
@@ -86,6 +93,7 @@ async def send_new_houses_to_telegram():
 
     geoapify = Geoapify()
     transitous = Transitous()
+    areas = Areas()
 
     async with Bot(token) as bot:    
         for entry in new_entries:
@@ -95,7 +103,8 @@ async def send_new_houses_to_telegram():
                 coordinates = geoapify.get_coordinates(entry['address'], entry['zip'])
                 map_image = geoapify.get_amsterdam_center_with_marker(coordinates)
                 travel_time = transitous.get_travel_time_to_work(coordinates[0], coordinates[1])
-                await bot.send_photo(chat_id=groupId, photo=map_image, caption=format_message(entry, travel_time),
+                area_type = areas.get_area_type(coordinates[0], coordinates[1])
+                await bot.send_photo(chat_id=groupId, photo=map_image, caption=format_message(entry, travel_time, area_type),
                                      parse_mode=constants.ParseMode.HTML)
             except Exception as e:
                 print('Failed with image generation, sending normal text')
