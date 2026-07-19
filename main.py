@@ -8,7 +8,7 @@ import asyncio
 from funda_scraper import FundaScraper
 
 from geoapify import Geoapify
-from transitous import Transitous, TransitousTravelTimeResult
+from transitous import Transitous, TransitousTransitResult, TransitousClosestPOIResult
 from areas import Areas, AreaType
 
 
@@ -53,13 +53,28 @@ def update_houses_db():
     ctx.close()
 
 
-def format_message(row, travel_time: TransitousTravelTimeResult, area_type: AreaType) -> str:
+def format_message(row, travel_time: TransitousTransitResult | None, area_type: AreaType, nearest_POI_travel: TransitousClosestPOIResult | None) -> str:
     if area_type == AreaType.GREEN:
         area_marker = '🟢 '
     elif area_type == AreaType.ORANGE:
         area_marker = '🟠 '
     else:
         area_marker = ''
+
+    if travel_time:
+        transit_line = f'{travel_time.travel_modes_emojis} {travel_time.travel_time_min}-{travel_time.travel_time_max} min'
+    else:
+        transit_line = '💼❔'
+
+    if not nearest_POI_travel.travel_time_walk and not nearest_POI_travel.travel_time_bike:
+        POI_line = '🗽🛸'
+    elif nearest_POI_travel.travel_time_walk and nearest_POI_travel.travel_time_walk <= 15:
+        POI_line = f'🗽🚶 {nearest_POI_travel.travel_time_walk} min'
+    elif nearest_POI_travel.travel_time_walk and nearest_POI_travel.travel_time_bike:
+        POI_line = f'🗽🚶 {nearest_POI_travel.travel_time_walk} min 🚴 {nearest_POI_travel.travel_time_bike} min'
+    else:
+        POI_line = f'🗽🚴 {nearest_POI_travel.travel_time_bike} min'
+
     return f"""
 {area_marker}<b>{row['address']}</b>
 💶 {row['price']:,}
@@ -67,7 +82,9 @@ def format_message(row, travel_time: TransitousTravelTimeResult, area_type: Area
 🚪 {row['room']} 🛏️ {row['bedroom']}
 ⚡️ {row['energy_label']}
 ⏳ {row['year_built']}
-{travel_time.travel_modes_emojis} {travel_time.travel_time_min}-{travel_time.travel_time_max}
+
+{transit_line}
+{POI_line}
 
 {row['url']}
 """
@@ -104,7 +121,9 @@ async def send_new_houses_to_telegram():
                 map_image = geoapify.get_amsterdam_center_with_marker(coordinates)
                 travel_time = transitous.get_travel_time_to_work(coordinates[0], coordinates[1])
                 area_type = areas.get_area_type(coordinates[0], coordinates[1])
-                await bot.send_photo(chat_id=groupId, photo=map_image, caption=format_message(entry, travel_time, area_type),
+                nearest_POIs = areas.get_points_of_interest_nearby(coordinates[0], coordinates[1])
+                nearest_POI_travel = transitous.get_closest_POI_by_bike_or_walk(coordinates[0], coordinates[1], nearest_POIs)
+                await bot.send_photo(chat_id=groupId, photo=map_image, caption=format_message(entry, travel_time, area_type, nearest_POI_travel),
                                      parse_mode=constants.ParseMode.HTML)
             except Exception as e:
                 print('Failed with image generation, sending normal text')
