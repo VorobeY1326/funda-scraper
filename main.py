@@ -76,7 +76,7 @@ def format_message(row, travel_time: TransitousTransitResult | None, area_type: 
         POI_line = f'🗽🚴 {nearest_POI_travel.travel_time_bike} min'
 
     return f"""
-{area_marker}<b>{row['address']}</b>
+{area_marker}<b>{(row['city'] or '').title()}, {row['address']}</b>
 💶 {row['price']:,}
 🏠 {row['living_area']} m2
 🚪 {row['room']} 🛏️ {row['bedroom']}
