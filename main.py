@@ -10,6 +10,7 @@ from funda_scraper import FundaScraper
 from geoapify import Geoapify
 from transitous import Transitous, TransitousTransitResult, TransitousClosestPOIResult
 from areas import Areas, AreaType
+from postcode_to_neighbourhood import get_neighbourhood_or_city_name
 
 
 TABLE_NAME = "houses"
@@ -75,8 +76,10 @@ def format_message(row, travel_time: TransitousTransitResult | None, area_type: 
     else:
         POI_line = f'🗽🚴 {nearest_POI_travel.travel_time_bike} min'
 
+    neighbourhood = get_neighbourhood_or_city_name((row['city'] or '').title(), row['zip'])
+
     return f"""
-{area_marker}<b>{(row['city'] or '').title()}, {row['address']}</b>
+{area_marker}<b>{neighbourhood}, {row['address']}</b>
 💶 {row['price']:,}
 🏠 {row['living_area']} m2
 🚪 {row['room']} 🛏️ {row['bedroom']}
